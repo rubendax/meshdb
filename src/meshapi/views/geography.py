@@ -20,7 +20,7 @@ from rest_framework.views import APIView
 from rest_framework_dataclasses.serializers import DataclassSerializer
 
 from meshapi.exceptions import InvalidAddressError, UnsupportedAddressError
-from meshapi.models import LOS, Install, Link, Node
+from meshapi.models import Install, Link, Node
 from meshapi.validation import geocode_nyc_address
 from meshapi.views.forms import INVALID_ADDRESS_RESPONSE, UNSUPPORTED_ADDRESS_RESPONSE, VALIDATION_500_RESPONSE
 
@@ -39,9 +39,8 @@ REMOTE_COLOR = "#800080"
 HUB_COLOR = "#5AC8FA"
 
 # Define link type colors
-LOS_COLOR = "#000000"
 LINK_TYPE_COLORS = {
-    "Other": "#2D2D2D",
+    "Other": "#000000",
     "VPN": "#7F0093",
     "5 GHz": "#297AFE",      
     "6 GHz": "#41A3FF",      
@@ -75,7 +74,6 @@ LinkKMLDict = TypedDict(
     "LinkKMLDict",
     {
         "link_label": str,
-        "is_los": bool,
         "from_coord": Tuple[float, float, float],
         "to_coord": Tuple[float, float, float],
         "extended_data": Dict[str, Any],
@@ -283,14 +281,6 @@ class WholeMeshKML(APIView):
             ],
         )
 
-        los_line = styles.Style(
-            id="los_line",
-            styles=[
-                styles.LineStyle(color=hex_to_kml_color(LOS_COLOR), width=2),
-                styles.PolyStyle(color="00000000", fill=False, outline=True),
-            ],
-        )
-
         # Create style definitions for each link type
         link_styles = []
         for link_type, color in LINK_TYPE_COLORS.items():
@@ -308,8 +298,7 @@ class WholeMeshKML(APIView):
             ns,
             styles=[
                 red_dot, blue_dot, hub_dot,
-                green_dot, yellow_dot, purple_dot,
-                los_line
+                green_dot, yellow_dot, purple_dot
             ] + link_styles
         )
         kml_root.append(kml_document)
@@ -340,10 +329,6 @@ class WholeMeshKML(APIView):
             type_folders[link_type] = kml.Folder(name=link_type)
             links_folder.append(type_folders[link_type])
             
-        # Create a dedicated folder for LOS links
-        los_folder = kml.Folder(name="LOS")
-        links_folder.append(los_folder)
-
         # Create a dictionary to map coordinates to installs and nodes
         location_map = {}  # Key: (lon, lat), Value: {'installs': [], 'node': None, 'active': False}
         
@@ -500,7 +485,6 @@ class WholeMeshKML(APIView):
             kml_links.append(
                 {
                     "link_label": link_label,
-                    "is_los": False,
                     "from_coord": (
                         link.from_device.node.longitude,
                         link.from_device.node.latitude,
@@ -521,86 +505,6 @@ class WholeMeshKML(APIView):
                 }
             )
 
-        for los in (
-            LOS.objects.filter(
-                Exists(Install.objects.filter(building=OuterRef("from_building"), status=Install.InstallStatus.ACTIVE))
-                & Exists(Install.objects.filter(building=OuterRef("to_building"), status=Install.InstallStatus.ACTIVE))
-                & ~Q(from_building=F("to_building"))
-            )
-            .exclude(
-                # Remove any LOS objects that would duplicate Link objects
-                Exists(
-                    Link.objects.filter(
-                        (
-                            Q(from_device__node__buildings=OuterRef("from_building"))
-                            & Q(to_device__node__buildings=OuterRef("to_building"))
-                        )
-                        | (
-                            Q(from_device__node__buildings=OuterRef("to_building"))
-                            & Q(to_device__node__buildings=OuterRef("from_building"))
-                        )
-                    )
-                )
-            )
-            .prefetch_related("from_building")
-            .prefetch_related("from_building__installs")
-            .prefetch_related("from_building__primary_node")  # Prefetch primary_node
-            .prefetch_related("to_building")
-            .prefetch_related("to_building__installs")
-            .prefetch_related("to_building__primary_node")  # Prefetch primary_node
-            .annotate(highest_altitude=Greatest("from_building__altitude", "to_building__altitude"))
-            .order_by(F("highest_altitude").asc(nulls_first=True))
-        ):
-            representative_from_install = min(los.from_building.installs.all().values_list("install_number", flat=True))
-            representative_to_install = min(los.to_building.installs.all().values_list("install_number", flat=True))
-            link_label = f"{representative_from_install}<->{representative_to_install}"
-
-            link_tuple = tuple(sorted((representative_from_install, representative_to_install)))
-            if link_tuple not in all_links_set:
-                all_links_set.add(link_tuple)
-                
-                # Get from coordinates - prioritize node coordinates if available
-                if los.from_building.primary_node and los.from_building.primary_node.latitude is not None and los.from_building.primary_node.longitude is not None:
-                    from_coord = (
-                        los.from_building.primary_node.longitude,
-                        los.from_building.primary_node.latitude,
-                        los.from_building.primary_node.altitude or DEFAULT_ALTITUDE,
-                    )
-                else:
-                    from_coord = (
-                        los.from_building.longitude,
-                        los.from_building.latitude,
-                        los.from_building.altitude or DEFAULT_ALTITUDE,
-                    )
-                
-                # Get to coordinates - prioritize node coordinates if available
-                if los.to_building.primary_node and los.to_building.primary_node.latitude is not None and los.to_building.primary_node.longitude is not None:
-                    to_coord = (
-                        los.to_building.primary_node.longitude,
-                        los.to_building.primary_node.latitude,
-                        los.to_building.primary_node.altitude or DEFAULT_ALTITUDE,
-                    )
-                else:
-                    to_coord = (
-                        los.to_building.longitude,
-                        los.to_building.latitude,
-                        los.to_building.altitude or DEFAULT_ALTITUDE,
-                    )
-                
-                kml_links.append(
-                    {
-                        "link_label": link_label,
-                        "is_los": True,
-                        "from_coord": from_coord,
-                        "to_coord": to_coord,
-                        "extended_data": {
-                            "from": f"#{representative_from_install} ({los.from_building.street_address})",
-                            "to": f"#{representative_to_install} ({los.to_building.street_address})",
-                            "source": los.source,
-                        },
-                    }
-                )
-
         # Prioritize links to show higher frequency links when there are duplicates
         kml_links = self.prioritize_links(kml_links)
         
@@ -616,11 +520,7 @@ class WholeMeshKML(APIView):
             placemark = kml.Placemark(
                 name=f"{link_dict['link_label']}",
                 style_url=styles.StyleUrl(
-                    url=(
-                        "#los_line"
-                        if link_dict["is_los"]
-                        else f"#{style_id}"
-                    )
+                    url=f"#{style_id}"
                 ),
                 kml_geometry=geometry.LineString(
                     geometry=LineString([link_dict["from_coord"], link_dict["to_coord"]]),
@@ -634,10 +534,7 @@ class WholeMeshKML(APIView):
             )
 
             # Add to the appropriate folder based on type
-            if link_dict["is_los"]:
-                los_folder.append(placemark)
-            else:
-                type_folders[link_type].append(placemark)
+            type_folders[link_type].append(placemark)
 
         # Generate the KML string
         kml_string = kml_root.to_string()
