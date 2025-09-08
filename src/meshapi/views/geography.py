@@ -481,6 +481,10 @@ class WholeMeshKML(APIView):
                 int, link.to_device.node.network_number
             )
 
+            # Skip links where from and to nodes are the same (zero length)
+            if from_identifier == to_identifier:
+                continue
+
             all_links_set.add(tuple(sorted((from_identifier, to_identifier))))
             kml_links.append(
                 {
