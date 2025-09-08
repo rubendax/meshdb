@@ -67,7 +67,7 @@ def hex_to_kml_color(hex_color, alpha=255):
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
 
-DOT_SIZE = 1
+DOT_SIZE = 1.25
 DOT_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
 
 LinkKMLDict = TypedDict(
@@ -224,7 +224,7 @@ class WholeMeshKML(APIView):
             styles=[
                 styles.IconStyle(
                     color=hex_to_kml_color(SUPERNODE_COLOR),
-                    scale=DOT_SIZE + 1,
+                    scale=DOT_SIZE * 2,
                     icon=styles.Icon(href=DOT_URL),
                     hot_spot=styles.HotSpot(x=0.5, y=0.5, xunits=styles.Units.fraction, yunits=styles.Units.fraction),
                 )
@@ -237,7 +237,7 @@ class WholeMeshKML(APIView):
             styles=[
                 styles.IconStyle(
                     color=hex_to_kml_color(HUB_COLOR),
-                    scale=DOT_SIZE + 0.5,
+                    scale=DOT_SIZE * 1.5,
                     icon=styles.Icon(href=DOT_URL),
                     hot_spot=styles.HotSpot(x=0.5, y=0.5, xunits=styles.Units.fraction, yunits=styles.Units.fraction),
                 )
@@ -262,7 +262,7 @@ class WholeMeshKML(APIView):
             styles=[
                 styles.IconStyle(
                     color=hex_to_kml_color(POP_COLOR),
-                    scale=DOT_SIZE + 1,
+                    scale=DOT_SIZE * 2,
                     icon=styles.Icon(href=DOT_URL),
                     hot_spot=styles.HotSpot(x=0.5, y=0.5, xunits=styles.Units.fraction, yunits=styles.Units.fraction),
                 )
