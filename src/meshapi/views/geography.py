@@ -67,7 +67,7 @@ def hex_to_kml_color(hex_color, alpha=255):
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
 
-DOT_SIZE = 1.25
+DOT_SIZE = 2
 DOT_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
 
 LinkKMLDict = TypedDict(
@@ -334,8 +334,7 @@ class WholeMeshKML(APIView):
         
         # First pass: group installs by location
         for install in (
-            Install.objects.prefetch_related("node")
-            .prefetch_related("building")
+            Install.objects.select_related("node", "building")
             .filter(
                 ~Q(status__in=[Install.InstallStatus.CLOSED, Install.InstallStatus.NN_REASSIGNED])
                 & Q(building__longitude__isnull=False)
@@ -461,14 +460,16 @@ class WholeMeshKML(APIView):
             # Add to the appropriate folder
             folder.append(placemark)
 
-        all_links_set = set()
         kml_links: List[LinkKMLDict] = []
         for link in (
-            Link.objects.prefetch_related("from_device")
-            .prefetch_related("to_device")
+            Link.objects.select_related("from_device__node", "to_device__node")
             .filter(status=Link.LinkStatus.ACTIVE)  # Only include active links
             .filter(from_device__node__network_number__isnull=False)
             .filter(to_device__node__network_number__isnull=False)
+            .filter(from_device__node__latitude__isnull=False)
+            .filter(from_device__node__longitude__isnull=False)
+            .filter(to_device__node__latitude__isnull=False)
+            .filter(to_device__node__longitude__isnull=False)
             .exclude(type=Link.LinkType.VPN)
             .annotate(highest_altitude=Greatest("from_device__node__altitude", "to_device__node__altitude"))
             .order_by(F("highest_altitude").asc(nulls_first=True))
@@ -485,7 +486,6 @@ class WholeMeshKML(APIView):
             if from_identifier == to_identifier:
                 continue
 
-            all_links_set.add(tuple(sorted((from_identifier, to_identifier))))
             kml_links.append(
                 {
                     "link_label": link_label,
