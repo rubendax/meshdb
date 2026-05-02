@@ -69,9 +69,7 @@ def hex_to_kml_color(hex_color, alpha=255):
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
 
-DOT_ICON_SMALL_PATH = "meshapi/kml-icons/dot-50.png"
-DOT_ICON_MEDIUM_PATH = "meshapi/kml-icons/dot-75.png"
-DOT_ICON_LARGE_PATH = "meshapi/kml-icons/dot-100.png"
+DOT_ICON_PATH = "meshapi/kml-icons/dot-100.png"
 DOT_FALLBACK_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
 KML_ICON_BASE_URL = os.environ.get("KML_ICON_BASE_URL") or os.environ.get("SITE_BASE_URL")
 
@@ -230,7 +228,7 @@ class ActiveMeshKML(APIView):
 
         # Use one high-resolution icon for all node styles and control visual size via scale.
         # This is rendered more consistently by KML clients than relying on PNG dimensions alone.
-        base_dot_url = absolute_static_url(request, DOT_ICON_LARGE_PATH)
+        base_dot_url = absolute_static_url(request, DOT_ICON_PATH)
 
         red_dot_url = base_dot_url
         hub_dot_url = base_dot_url
