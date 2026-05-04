@@ -41,15 +41,18 @@ REMOTE_COLOR = "#800080"
 HUB_COLOR = "#5AC8FA"
 
 # Define link type colors
+WDS_OMNI_5_GHZ_LINK_TYPE = "5 GHz (likely WDS)"
+
 LINK_TYPE_COLORS = {
     "Other": "#000000",
     "VPN": "#7F0093",
-    "5 GHz": "#297AFE",      
-    "6 GHz": "#41A3FF",      
-    "24 GHz": "#40D1EE",     
-    "60 GHz": "#44FCF9",     
-    "70-80 GHz": "#44FCDD",  
-    "Fiber": "#F6BE00",      
+    "5 GHz": "#297AFE",
+    WDS_OMNI_5_GHZ_LINK_TYPE: "#153E82",
+    "6 GHz": "#41A3FF",
+    "24 GHz": "#40D1EE",
+    "60 GHz": "#44FCF9",
+    "70-80 GHz": "#44FCDD",
+    "Fiber": "#F6BE00",
     "Ethernet": "#A07B00",
 }
 
@@ -68,6 +71,34 @@ def hex_to_kml_color(hex_color, alpha=255):
     hex_color = hex_color.lstrip('#')
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
+
+
+def link_type_to_style_id(link_type: str) -> str:
+    return f"{link_type.replace(' ', '_').replace('-', '_').replace('/', '_')}_line"
+
+
+def is_omni_device_name(device_name: Optional[str]) -> bool:
+    return bool(device_name and device_name.lower().endswith("-omni"))
+
+
+def get_kml_link_type(link: Link) -> str:
+    if link.type == Link.LinkType.FIVE_GHZ_WDS:
+        # Always isolate explicit WDS links
+        return WDS_OMNI_5_GHZ_LINK_TYPE
+
+    is_omni_to_omni = is_omni_device_name(link.from_device.name) and is_omni_device_name(link.to_device.name)
+    five_ghz_non_wlan4_types = {
+        Link.LinkType.FIVE_GHZ_UNSPECIFIED,
+    }
+    if is_omni_to_omni and link.type in five_ghz_non_wlan4_types:
+        # Treat ambiguous omni<->omni 5 GHz links as WDS for filtering
+        return WDS_OMNI_5_GHZ_LINK_TYPE
+
+    # Wlan4 and Airmax should render as regular 5 GHz when not classified as WDS above
+    if link.type in [Link.LinkType.FIVE_GHZ_WLAN, Link.LinkType.FIVE_GHZ_AIRMAX]:
+        return Link.LinkType.FIVE_GHZ_UNSPECIFIED
+
+    return link.type or "Other"
 
 DOT_ICON_PATH = "meshapi/kml-icons/dot-100.png"
 DOT_FALLBACK_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
@@ -124,13 +155,12 @@ def absolute_static_url(request: HttpRequest, static_path: str, fallback_url: st
 def create_placemark(identifier: str, point: Point, status: str, node_type: str = None, node_name: str = None) -> kml.Placemark:
     # Determine the appropriate style based on node type
     if node_type in ["Hub", "Supernode", "POP", "AP", "Remote"]:
-        # Map node types to style URLs based on user's color preferences
         style_map = {
-            "Hub": "#hub_dot",           # Hub should be teal blue
-            "Supernode": "#blue_dot",    # Supernode should be blue
-            "POP": "#yellow_dot",        # POP should be yellow
-            "AP": "#green_dot",          # AP should be green
-            "Remote": "#purple_dot",     # Remote should be purple
+            "Hub": "#hub_dot",          
+            "Supernode": "#blue_dot",
+            "POP": "#yellow_dot",
+            "AP": "#green_dot",
+            "Remote": "#purple_dot",
         }
         style_url_value = style_map.get(node_type, "#red_dot")
     else:
@@ -171,8 +201,9 @@ class ActiveMeshKML(APIView):
             "24 GHz": 5,
             "6 GHz": 6,
             "5 GHz": 7,
-            "Other": 8,
-            "VPN": 9
+            WDS_OMNI_5_GHZ_LINK_TYPE: 8,
+            "Other": 9,
+            "VPN": 10,
         }
         
         # Group links by coordinates
@@ -316,7 +347,7 @@ class ActiveMeshKML(APIView):
         for link_type, color in LINK_TYPE_COLORS.items():
             link_styles.append(
                 styles.Style(
-                    id=f"{link_type.replace(' ', '_').replace('-', '_')}_line",
+                    id=link_type_to_style_id(link_type),
                     styles=[
                         styles.LineStyle(color=hex_to_kml_color(color), width=3),
                         styles.PolyStyle(color="00000000", fill=False, outline=True),
@@ -530,7 +561,8 @@ class ActiveMeshKML(APIView):
                         link.to_device.node.altitude or DEFAULT_ALTITUDE,
                     ),
                     "extended_data": {
-                        "type": link.type,
+                        "type": get_kml_link_type(link),
+                        "raw_type": link.type,
                         "status": link.status,
                         "from": str(from_identifier),
                         "to": str(to_identifier),
@@ -549,7 +581,7 @@ class ActiveMeshKML(APIView):
                 link_type = "Other"
             
             # Create style URL based on type
-            style_id = f"{link_type.replace(' ', '_').replace('-', '_')}_line"
+            style_id = link_type_to_style_id(link_type)
             
             placemark = kml.Placemark(
                 name=f"{link_dict['link_label']}",
