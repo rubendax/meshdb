@@ -318,7 +318,7 @@ class ActiveMeshKML(APIView):
                 styles.Style(
                     id=f"{link_type.replace(' ', '_').replace('-', '_')}_line",
                     styles=[
-                        styles.LineStyle(color=hex_to_kml_color(color), width=2),
+                        styles.LineStyle(color=hex_to_kml_color(color), width=3),
                         styles.PolyStyle(color="00000000", fill=False, outline=True),
                     ],
                 )
