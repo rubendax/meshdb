@@ -16,10 +16,7 @@ def index(request: HttpRequest) -> HttpResponse:
         ],
         ("meshweb/volunteer.png", "Volunteer Tools"): [
             ("/admin", "Admin Panel"),
-            ("/static/meshweb/meshdb-active.kml", "KML Download (Active)"),
-            ("/api/v1/geography/active-mesh.kml", "Offline KML Download (Active)"),
-            ("/static/meshweb/meshdb.kml", "KML Download (Full)"),
-            ("/api/v1/geography/whole-mesh.kml", "Offline KML Download (Full)"),
+            ("javascript:openKmlDownloadModal()", "Download full-network KML"),
             ("/explorer/play", "SQL Explorer"),
             (f"{settings.FORMS_URL}/nn-assign/", "NN Assign Form"),
             (f"{settings.FORMS_URL}/query/", "Query Form"),
