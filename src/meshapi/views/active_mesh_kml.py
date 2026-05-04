@@ -82,23 +82,26 @@ def is_omni_device_name(device_name: Optional[str]) -> bool:
 
 
 def get_kml_link_type(link: Link) -> str:
-    if link.type == Link.LinkType.FIVE_GHZ_WDS:
-        # Always isolate explicit WDS links
+    raw_type = link.type
+
+    # Always isolate explicit WDS links
+    if raw_type == Link.LinkType.FIVE_GHZ_WDS:
         return WDS_OMNI_5_GHZ_LINK_TYPE
 
-    is_omni_to_omni = is_omni_device_name(link.from_device.name) and is_omni_device_name(link.to_device.name)
-    five_ghz_non_wlan4_types = {
+    # Keep all non-WDS 5 GHz variants grouped as regular 5 GHz in KML
+    if raw_type in {
         Link.LinkType.FIVE_GHZ_UNSPECIFIED,
-    }
-    if is_omni_to_omni and link.type in five_ghz_non_wlan4_types:
-        # Treat ambiguous omni<->omni 5 GHz links as WDS for filtering
-        return WDS_OMNI_5_GHZ_LINK_TYPE
+        Link.LinkType.FIVE_GHZ_WLAN,
+        Link.LinkType.FIVE_GHZ_AIRMAX,
+    }:
+        is_omni_to_omni = is_omni_device_name(link.from_device.name) and is_omni_device_name(link.to_device.name)
+        if is_omni_to_omni and raw_type == Link.LinkType.FIVE_GHZ_UNSPECIFIED:
+            # Treat ambiguous omni<->omni unspecified 5 GHz links as WDS-like for filtering
+            return WDS_OMNI_5_GHZ_LINK_TYPE
 
-    # Wlan4 and Airmax should render as regular 5 GHz when not classified as WDS above
-    if link.type in [Link.LinkType.FIVE_GHZ_WLAN, Link.LinkType.FIVE_GHZ_AIRMAX]:
         return Link.LinkType.FIVE_GHZ_UNSPECIFIED
 
-    return link.type or "Other"
+    return raw_type or "Other"
 
 DOT_ICON_PATH = "meshapi/kml-icons/dot-100.png"
 DOT_FALLBACK_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
