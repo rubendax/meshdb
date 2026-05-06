@@ -67,9 +67,10 @@ NODE_TYPE_COLORS = {
     "Remote": REMOTE_COLOR,
 }
 
+
 def hex_to_kml_color(hex_color, alpha=255):
     """Convert hex color (#RRGGBB) to KML color format (AABBGGRR)"""
-    hex_color = hex_color.lstrip('#')
+    hex_color = hex_color.lstrip("#")
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
 
@@ -103,6 +104,7 @@ def get_kml_link_type(link: Link) -> str:
         return Link.LinkType.FIVE_GHZ_UNSPECIFIED
 
     return raw_type or "Other"
+
 
 logger = logging.getLogger(__name__)
 
@@ -172,11 +174,13 @@ def absolute_static_url(request: HttpRequest, static_path: str, fallback_url: st
         return fallback_url
 
 
-def create_placemark(identifier: str, point: Point, status: str, node_type: str = None, node_name: str = None) -> kml.Placemark:
+def create_placemark(
+    identifier: str, point: Point, status: str, node_type: str = None, node_name: str = None
+) -> kml.Placemark:
     # Determine the appropriate style based on node type
     if node_type in ["Hub", "Supernode", "POP", "AP", "Remote"]:
         style_map = {
-            "Hub": "#hub_dot",          
+            "Hub": "#hub_dot",
             "Supernode": "#blue_dot",
             "POP": "#yellow_dot",
             "AP": "#green_dot",
@@ -185,7 +189,7 @@ def create_placemark(identifier: str, point: Point, status: str, node_type: str 
         style_url_value = style_map.get(node_type, "#red_dot")
     else:
         style_url_value = "#red_dot"  # Standard node
-    
+
     placemark = kml.Placemark(
         name=identifier,
         style_url=styles.StyleUrl(url=style_url_value),
@@ -210,7 +214,7 @@ def create_placemark(identifier: str, point: Point, status: str, node_type: str 
 class ActiveMeshKML(APIView):
     permission_classes = [permissions.AllowAny]
     content_negotiation_class = IgnoreClientContentNegotiation
-    
+
     def prioritize_links(self, kml_links):
         # Define priority order (lower number = higher priority)
         priority_order = {
@@ -225,7 +229,7 @@ class ActiveMeshKML(APIView):
             "Other": 9,
             "VPN": 10,
         }
-        
+
         # Group links by coordinates
         link_groups = {}
         for link in kml_links:
@@ -234,11 +238,11 @@ class ActiveMeshKML(APIView):
             coords = [link["from_coord"], link["to_coord"]]
             coords.sort()  # Sort to ensure consistent ordering
             key = tuple(map(tuple, coords))  # Convert to hashable type
-            
+
             if key not in link_groups:
                 link_groups[key] = []
             link_groups[key].append(link)
-        
+
         # Select highest priority link from each group
         prioritized_links = []
         for group in link_groups.values():
@@ -249,17 +253,17 @@ class ActiveMeshKML(APIView):
                 # Multiple links, select the one with highest priority
                 best_link = group[0]
                 best_priority = priority_order.get(best_link["extended_data"].get("type", "Other"), 9)
-                
+
                 for link in group[1:]:
                     link_type = link["extended_data"].get("type", "Other")
                     link_priority = priority_order.get(link_type, 9)
-                    
+
                     if link_priority < best_priority:
                         best_link = link
                         best_priority = link_priority
-                
+
                 prioritized_links.append(best_link)
-        
+
         return prioritized_links
 
     @extend_schema(
@@ -376,11 +380,7 @@ class ActiveMeshKML(APIView):
             )
 
         kml_document = kml.Document(
-            ns,
-            styles=[
-                red_dot, blue_dot, hub_dot,
-                green_dot, yellow_dot, purple_dot
-            ] + link_styles
+            ns, styles=[red_dot, blue_dot, hub_dot, green_dot, yellow_dot, purple_dot] + link_styles
         )
         kml_root.append(kml_document)
 
@@ -389,14 +389,14 @@ class ActiveMeshKML(APIView):
 
         # Create node type folders
         node_type_folders = {}
-        
+
         # Define all node types
         node_types = ["Standard", "Hub", "Supernode", "POP", "AP", "Remote"]
-        
+
         # Create folders for each node type
         for node_type in node_types:
             folder_name = f"{node_type} Nodes"
-            
+
             # Create folder for this node type
             node_type_folders[node_type] = kml.Folder(name=folder_name)
             nodes_folder.append(node_type_folders[node_type])
@@ -409,10 +409,10 @@ class ActiveMeshKML(APIView):
         for link_type in list(LINK_TYPE_COLORS.keys()):
             type_folders[link_type] = kml.Folder(name=link_type)
             links_folder.append(type_folders[link_type])
-            
+
         # Create a dictionary to map coordinates to installs and nodes
         location_map = {}  # Key: (lon, lat), Value: {'installs': [], 'node': None, 'active': False}
-        
+
         # First pass: group installs by location
         for install in (
             Install.objects.select_related("node", "building")
@@ -431,32 +431,32 @@ class ActiveMeshKML(APIView):
             else:
                 location_key = (install.building.longitude, install.building.latitude)
                 altitude = install.building.altitude or DEFAULT_ALTITUDE
-            
+
             # Initialize location entry if it doesn't exist
             if location_key not in location_map:
                 location_map[location_key] = {
-                    'installs': [],
-                    'node': None,
-                    'active': False,
-                    'altitude': altitude,
-                    'roof_access': False
+                    "installs": [],
+                    "node": None,
+                    "active": False,
+                    "altitude": altitude,
+                    "roof_access": False,
                 }
-            
+
             # Add this install to the location
-            location_map[location_key]['installs'].append(install)
-            
+            location_map[location_key]["installs"].append(install)
+
             # Track if any install at this location is active
             if install.status == Install.InstallStatus.ACTIVE:
-                location_map[location_key]['active'] = True
-            
+                location_map[location_key]["active"] = True
+
             # Track if any install has roof access
             if install.roof_access:
-                location_map[location_key]['roof_access'] = True
-            
+                location_map[location_key]["roof_access"] = True
+
             # If this install has a node with a network number, store it
             if install.node and install.node.network_number:
-                location_map[location_key]['node'] = install.node
-        
+                location_map[location_key]["node"] = install.node
+
         # Additional pass: add active nodes that might not have active installs
         for node in (
             Node.objects.filter(status=Node.NodeStatus.ACTIVE)
@@ -465,35 +465,35 @@ class ActiveMeshKML(APIView):
         ):
             # Create a location key based on coordinates
             location_key = (node.longitude, node.latitude)
-            
+
             # Initialize location entry if it doesn't exist
             if location_key not in location_map:
                 location_map[location_key] = {
-                    'installs': [],
-                    'node': node,
-                    'active': True,  # Mark as active since the node is active
-                    'altitude': node.altitude or DEFAULT_ALTITUDE,
-                    'roof_access': False
+                    "installs": [],
+                    "node": node,
+                    "active": True,  # Mark as active since the node is active
+                    "altitude": node.altitude or DEFAULT_ALTITUDE,
+                    "roof_access": False,
                 }
             else:
                 # Update existing location with node information if not already set
-                if not location_map[location_key]['node']:
-                    location_map[location_key]['node'] = node
+                if not location_map[location_key]["node"]:
+                    location_map[location_key]["node"] = node
                 # Mark as active since the node is active
-                location_map[location_key]['active'] = True
-        
+                location_map[location_key]["active"] = True
+
         # Second pass: create one placemark per unique location
         for location, data in location_map.items():
             lon, lat = location
-            installs = data['installs']
-            node = data['node']
-            is_active = data['active']
-            altitude = data['altitude']
-            
+            installs = data["installs"]
+            node = data["node"]
+            is_active = data["active"]
+            altitude = data["altitude"]
+
             # Skip inactive nodes
             if not is_active:
                 continue
-            
+
             # Determine the primary identifier and properties for the placemark
             if node:
                 # Prioritize network number (NN) as identifier
@@ -507,14 +507,14 @@ class ActiveMeshKML(APIView):
                 node_type = installs[0].node.type if installs[0].node else "Standard"
                 status = installs[0].status
                 node_name = installs[0].node.name if installs[0].node else None  # Get the node name if available
-            
+
             # Get only active install numbers at this location
             active_installs = [install for install in installs if install.status == Install.InstallStatus.ACTIVE]
             install_numbers = [str(install.install_number) for install in active_installs]
-            
+
             # Determine which folder to use based on node type
             folder = node_type_folders.get(node_type, node_type_folders["Standard"])
-            
+
             # Create the placemark
             placemark = create_placemark(
                 identifier,
@@ -523,21 +523,23 @@ class ActiveMeshKML(APIView):
                 node_type,
                 node_name,
             )
-            
+
             # Add install numbers to the extended data
             placemark.extended_data.elements.append(Data(name="install_numbers", value=",".join(install_numbers)))
-            
+
             # Add the total count of active installs
             placemark.extended_data.elements.append(Data(name="install_count", value=str(len(install_numbers))))
-            
+
             # Add install_date if available (from the earliest active install)
             if active_installs:
                 # Get the earliest install_date from active installs
                 install_dates = [install.install_date for install in active_installs if install.install_date]
                 if install_dates:
                     earliest_install_date = min(install_dates)
-                    placemark.extended_data.elements.append(Data(name="install_date", value=earliest_install_date.isoformat()))
-            
+                    placemark.extended_data.elements.append(
+                        Data(name="install_date", value=earliest_install_date.isoformat())
+                    )
+
             # Add to the appropriate folder
             folder.append(placemark)
 
@@ -593,21 +595,19 @@ class ActiveMeshKML(APIView):
 
         # Prioritize links to show higher frequency links when there are duplicates
         kml_links = self.prioritize_links(kml_links)
-        
+
         for link_dict in kml_links:
             # Determine link type
             link_type = link_dict["extended_data"].get("type")
             if not link_type or link_type not in LINK_TYPE_COLORS:
                 link_type = "Other"
-            
+
             # Create style URL based on type
             style_id = link_type_to_style_id(link_type)
-            
+
             placemark = kml.Placemark(
                 name=f"{link_dict['link_label']}",
-                style_url=styles.StyleUrl(
-                    url=f"#{style_id}"
-                ),
+                style_url=styles.StyleUrl(url=f"#{style_id}"),
                 kml_geometry=geometry.LineString(
                     geometry=LineString([link_dict["from_coord"], link_dict["to_coord"]]),
                     altitude_mode=AltitudeMode.absolute,
@@ -624,7 +624,7 @@ class ActiveMeshKML(APIView):
 
         # Generate the KML string
         kml_string = kml_root.to_string()
-        
+
         # Insert LookAt element directly into the KML XML string to set the initial NYC view for tools such as Google Earth
         doc_pos = kml_string.find("<Document")
         if doc_pos != -1:
@@ -641,8 +641,8 @@ class ActiveMeshKML(APIView):
     <range>80000</range>
     <altitudeMode>relativeToGround</altitudeMode>
   </LookAt>"""
-                kml_string = kml_string[:doc_end_pos+1] + lookat_xml + kml_string[doc_end_pos+1:]
-        
+                kml_string = kml_string[: doc_end_pos + 1] + lookat_xml + kml_string[doc_end_pos + 1 :]
+
         return HttpResponse(
             kml_string,
             content_type=KML_CONTENT_TYPE_WITH_CHARSET,
