@@ -13,7 +13,8 @@ from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_
 from fastkml import Data, ExtendedData, geometry, kml, styles
 from fastkml.enums import AltitudeMode
 from pygeoif import LineString, Point
-from rest_framework import permissions, serializers, status as http_status
+from rest_framework import permissions, serializers
+from rest_framework import status as http_status
 from rest_framework.negotiation import BaseContentNegotiation
 from rest_framework.parsers import BaseParser
 from rest_framework.renderers import BaseRenderer
