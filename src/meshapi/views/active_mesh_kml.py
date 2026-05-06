@@ -69,8 +69,8 @@ NODE_TYPE_COLORS = {
 }
 
 
-def hex_to_kml_color(hex_color, alpha=255):
-    """Convert hex color (#RRGGBB) to KML color format (AABBGGRR)"""
+def hex_to_kml_color(hex_color: str, alpha: int = 255) -> str:
+    """Convert hex color (#RRGGBB) to KML color format (AABBGGRR)."""
     hex_color = hex_color.lstrip("#")
     r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
     return f"{alpha:02x}{b}{g}{r}"
@@ -176,7 +176,11 @@ def absolute_static_url(request: HttpRequest, static_path: str, fallback_url: st
 
 
 def create_placemark(
-    identifier: str, point: Point, status: str, node_type: str = None, node_name: str = None
+    identifier: str,
+    point: Point,
+    status: str,
+    node_type: Optional[str] = None,
+    node_name: Optional[str] = None,
 ) -> kml.Placemark:
     # Determine the appropriate style based on node type
     if node_type in ["Hub", "Supernode", "POP", "AP", "Remote"]:
@@ -212,11 +216,23 @@ def create_placemark(
     return placemark
 
 
+LocationMapData = TypedDict(
+    "LocationMapData",
+    {
+        "installs": List[Install],
+        "node": Optional[Node],
+        "active": bool,
+        "altitude": float,
+        "roof_access": bool,
+    },
+)
+
+
 class ActiveMeshKML(APIView):
     permission_classes = [permissions.AllowAny]
     content_negotiation_class = IgnoreClientContentNegotiation
 
-    def prioritize_links(self, kml_links):
+    def prioritize_links(self, kml_links: List[LinkKMLDict]) -> List[LinkKMLDict]:
         # Define priority order (lower number = higher priority)
         priority_order = {
             "Fiber": 1,
@@ -232,7 +248,7 @@ class ActiveMeshKML(APIView):
         }
 
         # Group links by coordinates
-        link_groups = {}
+        link_groups: Dict[Tuple[Tuple[float, float, float], Tuple[float, float, float]], List[LinkKMLDict]] = {}
         for link in kml_links:
             # Create canonical representation of coordinates
             # Sort coordinates to ensure consistent ordering regardless of from/to direction
@@ -412,7 +428,7 @@ class ActiveMeshKML(APIView):
             links_folder.append(type_folders[link_type])
 
         # Create a dictionary to map coordinates to installs and nodes
-        location_map = {}  # Key: (lon, lat), Value: {'installs': [], 'node': None, 'active': False}
+        location_map: Dict[Tuple[float, float], LocationMapData] = {}
 
         # First pass: group installs by location
         for install in (
@@ -427,11 +443,11 @@ class ActiveMeshKML(APIView):
             # Create a location key based on coordinates
             # Prioritize node coordinates if available
             if install.node and install.node.latitude is not None and install.node.longitude is not None:
-                location_key = (install.node.longitude, install.node.latitude)
-                altitude = install.node.altitude or DEFAULT_ALTITUDE
+                location_key = (float(install.node.longitude), float(install.node.latitude))
+                altitude = float(install.node.altitude or DEFAULT_ALTITUDE)
             else:
-                location_key = (install.building.longitude, install.building.latitude)
-                altitude = install.building.altitude or DEFAULT_ALTITUDE
+                location_key = (float(install.building.longitude), float(install.building.latitude))
+                altitude = float(install.building.altitude or DEFAULT_ALTITUDE)
 
             # Initialize location entry if it doesn't exist
             if location_key not in location_map:
@@ -465,7 +481,7 @@ class ActiveMeshKML(APIView):
             .filter(longitude__isnull=False)
         ):
             # Create a location key based on coordinates
-            location_key = (node.longitude, node.latitude)
+            location_key = (float(node.longitude), float(node.latitude))
 
             # Initialize location entry if it doesn't exist
             if location_key not in location_map:
@@ -473,7 +489,7 @@ class ActiveMeshKML(APIView):
                     "installs": [],
                     "node": node,
                     "active": True,  # Mark as active since the node is active
-                    "altitude": node.altitude or DEFAULT_ALTITUDE,
+                    "altitude": float(node.altitude or DEFAULT_ALTITUDE),
                     "roof_access": False,
                 }
             else:
@@ -525,11 +541,16 @@ class ActiveMeshKML(APIView):
                 node_name,
             )
 
+            placemark_extended_data = placemark.extended_data
+            if placemark_extended_data is None:
+                placemark_extended_data = ExtendedData(elements=[])
+                placemark.extended_data = placemark_extended_data
+
             # Add install numbers to the extended data
-            placemark.extended_data.elements.append(Data(name="install_numbers", value=",".join(install_numbers)))
+            placemark_extended_data.elements.append(Data(name="install_numbers", value=",".join(install_numbers)))
 
             # Add the total count of active installs
-            placemark.extended_data.elements.append(Data(name="install_count", value=str(len(install_numbers))))
+            placemark_extended_data.elements.append(Data(name="install_count", value=str(len(install_numbers))))
 
             # Add install_date if available (from the earliest active install)
             if active_installs:
@@ -537,7 +558,7 @@ class ActiveMeshKML(APIView):
                 install_dates = [install.install_date for install in active_installs if install.install_date]
                 if install_dates:
                     earliest_install_date = min(install_dates)
-                    placemark.extended_data.elements.append(
+                    placemark_extended_data.elements.append(
                         Data(name="install_date", value=earliest_install_date.isoformat())
                     )
 
@@ -599,8 +620,9 @@ class ActiveMeshKML(APIView):
 
         for link_dict in kml_links:
             # Determine link type
-            link_type = link_dict["extended_data"].get("type")
-            if not link_type or link_type not in LINK_TYPE_COLORS:
+            link_type_value = link_dict["extended_data"].get("type")
+            link_type = link_type_value if isinstance(link_type_value, str) else "Other"
+            if link_type not in LINK_TYPE_COLORS:
                 link_type = "Other"
 
             # Create style URL based on type
