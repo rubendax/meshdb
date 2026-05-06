@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, cast
 from urllib.parse import urlparse
 
-from django.db.models import Exists, F, OuterRef, Q
+from django.db.models import F, Q
 from django.db.models.functions import Greatest
 from django.http import HttpRequest, HttpResponse
 from django.templatetags.static import static
@@ -626,7 +626,8 @@ class ActiveMeshKML(APIView):
         # Generate the KML string
         kml_string = kml_root.to_string()
 
-        # Insert LookAt element directly into the KML XML string to set the initial NYC view for tools such as Google Earth
+        # Insert LookAt element directly into the KML XML string
+        # to set the initial NYC view for tools such as Google Earth
         doc_pos = kml_string.find("<Document")
         if doc_pos != -1:
             doc_end_pos = kml_string.find(">", doc_pos)
