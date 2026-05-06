@@ -2,6 +2,7 @@ import logging
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple, TypedDict, cast
+from urllib.parse import urlparse
 
 from django.db.models import Exists, F, OuterRef, Q
 from django.db.models.functions import Greatest
@@ -103,9 +104,13 @@ def get_kml_link_type(link: Link) -> str:
 
     return raw_type or "Other"
 
+logger = logging.getLogger(__name__)
+
 DOT_ICON_PATH = "meshapi/kml-icons/dot-100.png"
-DOT_FALLBACK_URL = "http://maps.google.com/mapfiles/kml/shapes/dot.png"
+DOT_FALLBACK_URL = "https://rubendax.com/img/dot-100.png"
+KML_ICON_URL = os.environ.get("KML_ICON_URL")
 KML_ICON_BASE_URL = os.environ.get("KML_ICON_BASE_URL") or os.environ.get("SITE_BASE_URL")
+LOCAL_ONLY_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
 
 LinkKMLDict = TypedDict(
     "LinkKMLDict",
@@ -139,6 +144,9 @@ class IgnoreClientContentNegotiation(BaseContentNegotiation):
 
 def absolute_static_url(request: HttpRequest, static_path: str, fallback_url: str = DOT_FALLBACK_URL) -> str:
     try:
+        if KML_ICON_URL:
+            return KML_ICON_URL
+
         icon_url = static(static_path)
         # STATIC_URL is configured as "static/" in this project (no leading slash),
         # which can produce a path relative to the current request URL in KML.
@@ -147,9 +155,18 @@ def absolute_static_url(request: HttpRequest, static_path: str, fallback_url: st
             icon_url = f"/{icon_url}"
 
         if KML_ICON_BASE_URL:
-            return f"{KML_ICON_BASE_URL.rstrip('/')}{icon_url}"
+            resolved_url = f"{KML_ICON_BASE_URL.rstrip('/')}{icon_url}"
+        else:
+            resolved_url = request.build_absolute_uri(icon_url)
 
-        return request.build_absolute_uri(icon_url)
+        parsed = urlparse(resolved_url)
+        if parsed.hostname and parsed.hostname.lower() in LOCAL_ONLY_HOSTS:
+            logger.warning(
+                "Resolved KML icon URL points to local host (%s); using fallback URL instead", parsed.hostname
+            )
+            return fallback_url
+
+        return resolved_url
     except Exception:
         logger.exception("Failed to build absolute static URL for %s; using fallback", static_path)
         return fallback_url
