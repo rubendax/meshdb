@@ -252,9 +252,8 @@ class ActiveMeshKML(APIView):
         for link in kml_links:
             # Create canonical representation of coordinates
             # Sort coordinates to ensure consistent ordering regardless of from/to direction
-            coords = [link["from_coord"], link["to_coord"]]
-            coords.sort()  # Sort to ensure consistent ordering
-            key = tuple(map(tuple, coords))  # Convert to hashable type
+            coords = sorted([link["from_coord"], link["to_coord"]])
+            key: Tuple[Tuple[float, float, float], Tuple[float, float, float]] = (coords[0], coords[1])
 
             if key not in link_groups:
                 link_groups[key] = []
@@ -475,27 +474,27 @@ class ActiveMeshKML(APIView):
                 location_map[location_key]["node"] = install.node
 
         # Additional pass: add active nodes that might not have active installs
-        for node in (
+        for active_node in (
             Node.objects.filter(status=Node.NodeStatus.ACTIVE)
             .filter(latitude__isnull=False)
             .filter(longitude__isnull=False)
         ):
             # Create a location key based on coordinates
-            location_key = (float(node.longitude), float(node.latitude))
+            location_key = (float(active_node.longitude), float(active_node.latitude))
 
             # Initialize location entry if it doesn't exist
             if location_key not in location_map:
                 location_map[location_key] = {
                     "installs": [],
-                    "node": node,
+                    "node": active_node,
                     "active": True,  # Mark as active since the node is active
-                    "altitude": float(node.altitude or DEFAULT_ALTITUDE),
+                    "altitude": float(active_node.altitude or DEFAULT_ALTITUDE),
                     "roof_access": False,
                 }
             else:
                 # Update existing location with node information if not already set
                 if not location_map[location_key]["node"]:
-                    location_map[location_key]["node"] = node
+                    location_map[location_key]["node"] = active_node
                 # Mark as active since the node is active
                 location_map[location_key]["active"] = True
 
