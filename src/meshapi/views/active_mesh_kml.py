@@ -46,14 +46,14 @@ HUB_COLOR = "#5AC8FA"
 WDS_5_GHZ_LINK_TYPE = "WDS (5 GHz)"
 
 LINK_TYPE_COLORS = {
-    "Other": "#000000",
+    "Other": "#FFFFFF",
     "VPN": "#7F0093",
-    "5 GHz": "#297AFE",
-    WDS_5_GHZ_LINK_TYPE: "#153E82",
-    "6 GHz": "#41A3FF",
-    "24 GHz": "#40D1EE",
-    "60 GHz": "#44FCF9",
-    "70-80 GHz": "#44FCDD",
+    WDS_5_GHZ_LINK_TYPE: "#293BFE",
+    "5 GHz": "#2675f4",
+    "6 GHz": "#26a2f4",
+    "24 GHz": "#45dafc",
+    "60 GHz": "#45fcf8",
+    "70-80 GHz": "#45fcea",
     "Fiber": "#F6BE00",
     "Ethernet": "#A07B00",
 }
