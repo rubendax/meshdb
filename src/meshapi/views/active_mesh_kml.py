@@ -43,13 +43,13 @@ REMOTE_COLOR = "#800080"
 HUB_COLOR = "#5AC8FA"
 
 # Define link type colors
-WDS_OMNI_5_GHZ_LINK_TYPE = "5 GHz (likely WDS)"
+WDS_5_GHZ_LINK_TYPE = "WDS (5 GHz)"
 
 LINK_TYPE_COLORS = {
     "Other": "#000000",
     "VPN": "#7F0093",
     "5 GHz": "#297AFE",
-    WDS_OMNI_5_GHZ_LINK_TYPE: "#153E82",
+    WDS_5_GHZ_LINK_TYPE: "#153E82",
     "6 GHz": "#41A3FF",
     "24 GHz": "#40D1EE",
     "60 GHz": "#44FCF9",
@@ -80,16 +80,12 @@ def link_type_to_style_id(link_type: str) -> str:
     return f"{link_type.replace(' ', '_').replace('-', '_').replace('/', '_')}_line"
 
 
-def is_omni_device_name(device_name: Optional[str]) -> bool:
-    return bool(device_name and device_name.lower().endswith("-omni"))
-
-
 def get_kml_link_type(link: Link) -> str:
     raw_type = link.type
 
-    # Always isolate explicit WDS links
+    # Group explicit WDS links into their own KML folder/style
     if raw_type == Link.LinkType.FIVE_GHZ_WDS:
-        return WDS_OMNI_5_GHZ_LINK_TYPE
+        return WDS_5_GHZ_LINK_TYPE
 
     # Keep all non-WDS 5 GHz variants grouped as regular 5 GHz in KML
     if raw_type in {
@@ -97,11 +93,6 @@ def get_kml_link_type(link: Link) -> str:
         Link.LinkType.FIVE_GHZ_WLAN,
         Link.LinkType.FIVE_GHZ_AIRMAX,
     }:
-        is_omni_to_omni = is_omni_device_name(link.from_device.name) and is_omni_device_name(link.to_device.name)
-        if is_omni_to_omni and raw_type == Link.LinkType.FIVE_GHZ_UNSPECIFIED:
-            # Treat ambiguous omni<->omni unspecified 5 GHz links as WDS-like for filtering
-            return WDS_OMNI_5_GHZ_LINK_TYPE
-
         return Link.LinkType.FIVE_GHZ_UNSPECIFIED
 
     return raw_type or "Other"
@@ -242,7 +233,7 @@ class ActiveMeshKML(APIView):
             "24 GHz": 5,
             "6 GHz": 6,
             "5 GHz": 7,
-            WDS_OMNI_5_GHZ_LINK_TYPE: 8,
+            WDS_5_GHZ_LINK_TYPE: 8,
             "Other": 9,
             "VPN": 10,
         }
