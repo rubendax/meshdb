@@ -718,4 +718,5 @@ class ActiveMeshKML(APIView):
             kml_string,
             content_type=KML_CONTENT_TYPE_WITH_CHARSET,
             status=http_status.HTTP_200_OK,
+            headers={"Content-Disposition": 'attachment; filename="nycmesh-map-static.kml"'},
         )
